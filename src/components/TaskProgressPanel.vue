@@ -1,37 +1,44 @@
 <script setup>
-import { onUnmounted, ref } from 'vue'
-import { Activity, Check, RotateCcw } from 'lucide-vue-next'
+import { computed, onUnmounted, ref } from 'vue'
+import { Activity, Check, Circle, LoaderCircle, RotateCcw } from 'lucide-vue-next'
 
 const props = defineProps({
   title: { type: String, required: true },
   stages: { type: Array, required: true },
   logs: { type: Array, default: () => [] },
   result: { type: String, default: '处理完成，结果已就绪。' },
+  estimatedMinutes: { type: Number, default: 7 },
 })
 const emit = defineEmits(['complete', 'reset'])
 const running = ref(false), done = ref(false), progress = ref(0), stageIndex = ref(0)
-let timer, tick = 0
+const activeLogIndex = computed(() => props.logs.findIndex(log => progress.value < log.threshold))
+let timer, elapsedSeconds = 0, totalSeconds = 0
 const currentStage = () => {
   if (props.stages.length < 2) return 0
-  if (props.stages.length === 2) return progress.value < 58 ? 0 : 1
-  return progress.value < 30 ? 0 : progress.value < 78 ? 1 : 2
+  return Math.min(props.stages.length - 1, Math.floor(progress.value / 100 * props.stages.length))
 }
 const startTask = () => {
   clearInterval(timer)
-  done.value = false; running.value = true; progress.value = 0; stageIndex.value = 0; tick = 0
+  done.value = false; running.value = true; progress.value = 0; stageIndex.value = 0
+  elapsedSeconds = 0; totalSeconds = Math.max(300, Math.min(600, Math.round(props.estimatedMinutes * 60)))
   timer = setInterval(() => {
-    tick += 1
+    elapsedSeconds += 1
+    const elapsedRatio = Math.min(1, elapsedSeconds / totalSeconds)
+    // Scan quickly, spend most time on inference, then finish validation.
+    const nextProgress = elapsedRatio < 0.2
+      ? elapsedRatio / 0.2 * 18
+      : elapsedRatio < 0.8
+        ? 18 + (elapsedRatio - 0.2) / 0.6 * 54
+        : 72 + (elapsedRatio - 0.8) / 0.2 * 28
+    progress.value = Math.min(100, nextProgress)
     stageIndex.value = currentStage()
-    const base = stageIndex.value === 0 ? 0.22 : stageIndex.value === 1 ? 0.13 : 0.20
-    const fluctuation = tick % 17 < 5 ? 0.52 : tick % 11 < 3 ? 1.5 : 1
-    progress.value = Math.min(100, progress.value + base * fluctuation)
-    if (progress.value >= 100) {
+    if (elapsedSeconds >= totalSeconds) {
       clearInterval(timer); running.value = false; done.value = true; emit('complete')
     }
   }, 1000)
 }
 const resetTask = () => {
-  clearInterval(timer); running.value = false; done.value = false; progress.value = 0; stageIndex.value = 0; emit('reset')
+  clearInterval(timer); running.value = false; done.value = false; progress.value = 0; stageIndex.value = 0; elapsedSeconds = 0; totalSeconds = 0; emit('reset')
 }
 onUnmounted(() => clearInterval(timer))
 defineExpose({ startTask, resetTask })
@@ -49,12 +56,12 @@ defineExpose({ startTask, resetTask })
       <span>启动任务后，这里将显示实时进度与预计剩余时间。</span>
     </div>
     <div v-else class="task-progress-content">
-      <div class="progress-meta"><strong>{{done ? '处理完成' : stages[stageIndex]}}</strong><span>{{done ? '已完成' : `预计剩余 ${Math.max(1, Math.ceil((100 - progress) * 0.10))} 分钟`}}</span></div>
+      <div class="progress-meta"><strong class="progress-current-task"><LoaderCircle v-if="running" :size="15" class="progress-spinner"/><Check v-else :size="15" class="progress-complete-icon"/>{{done ? '处理完成' : stages[stageIndex]}}</strong><span>{{done ? '已完成' : `预计剩余 ${Math.max(1, Math.ceil((totalSeconds - elapsedSeconds) / 60))} 分钟`}}</span></div>
       <div class="progress-track"><i :style="{width: `${progress}%`}"/></div>
       <div class="progress-numbers"><b>{{Math.floor(progress)}}%</b><span>{{done ? '任务已完成' : `正在执行第 ${stageIndex + 1} / ${stages.length} 阶段`}}</span></div>
       <div class="log-list">
-        <div v-for="(log, index) in logs" :key="log" class="log-entry" :class="{dim: progress < log.threshold}">
-          <span class="log-mark"><Check :size="12"/></span><span>{{log.text}}</span>
+        <div v-for="(log, index) in logs" :key="log.threshold" class="log-entry" :class="{dim: !done && index !== activeLogIndex && progress < log.threshold, active: running && index === activeLogIndex, complete: done || progress >= log.threshold}">
+          <span class="log-mark"><LoaderCircle v-if="running && index===activeLogIndex" :size="13" class="progress-spinner"/><Check v-else-if="done || progress>=log.threshold" :size="12"/><Circle v-else :size="10"/></span><span>{{done || progress>=log.threshold ? log.text : running && index===activeLogIndex ? (log.runningText || log.text) : (log.pendingText || log.text)}}</span>
         </div>
       </div>
       <div v-if="done" class="result-callout"><Check :size="15"/><span><b>处理完成</b> · {{result}}</span></div>
