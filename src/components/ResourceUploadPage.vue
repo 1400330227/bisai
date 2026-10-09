@@ -729,7 +729,7 @@ const saveAndCreate = async () => {
 <style scoped>
 .upload-form-page {
   max-width: 1200px;
-  margin: 0 auto;
+  //margin: 0 auto;
   background-color: #ffffff;
   border: 1px solid #e9eeeb;
   border-radius: 9px;
