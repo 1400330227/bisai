@@ -1,7 +1,7 @@
 /* 东盟资源库数据大屏样式（替代原项目的 comon0.css，沿用其深色科技风） */
 .dashboard-landing {
   min-height: calc(100vh - 130px);
-  margin: -27px -34px -18px;
+  /*margin: -27px -34px -18px;*/
   padding: 20px 24px 26px;
   color: #fff;
   background: #000d4a radial-gradient(ellipse 90% 60% at 50% -8%, #0b2278 0%, #031054 52%, #00072e 100%);
@@ -56,13 +56,13 @@
 
 /* 最新动态滚动列表 */
 .dashboard-landing .wraptit { display: flex; padding: 2px 0 8px; border-bottom: 1px solid rgba(84, 138, 196, .45); font-size: 12px; color: #49bcf7; }
-.dashboard-landing .wraptit span { flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dashboard-landing .wraptit span { flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dashboard-landing .wrap { scrollbar-width: thin; scrollbar-color: rgba(73, 188, 247, .4) transparent; }
 .dashboard-landing .wrap::-webkit-scrollbar { width: 4px; }
 .dashboard-landing .wrap::-webkit-scrollbar-thumb { background: rgba(73, 188, 247, .4); border-radius: 2px; }
 .dashboard-landing .wrap ul { margin: 0; padding: 0; list-style: none; }
 .dashboard-landing .wrap ul li p { display: flex; margin: 0; padding: 9px 0; border-bottom: 1px dashed rgba(84, 138, 196, .2); font-size: 12px; color: rgba(255, 255, 255, .82); }
-.dashboard-landing .wrap ul li p span { flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
+.dashboard-landing .wrap ul li p span { flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
 
 @media (max-width: 1100px) {
   .dashboard-landing { margin: -27px -23px -18px; }

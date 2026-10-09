@@ -6,7 +6,7 @@
       </div>
       <div class="head">
         <div class="weather"><span id="showTime">{{ showTime }}</span></div>
-        <h1>广西大学东盟语料库管理与标注平台</h1>
+        <h1>东盟资源库</h1>
       </div>
       <div class="mainbox">
         <ul class="clearfix">
@@ -15,7 +15,7 @@
               <div class="alltitle">领域数据 TOP 10</div>
               <div class="navboxall" id="echart5"></div>
             </div>
-            <div class="boxall" style="height:400px;">
+            <div class="boxall" style="height:420px;">
               <div class="alltitle">各学院贡献占比分析</div>
               <div class="navboxall" id="echart1"></div>
             </div>
@@ -47,13 +47,13 @@
               <div class="alltitle">语料库贡献者 TOP 15</div>
               <div class="navboxall" id="echart4"></div>
             </div>
-            <div class="boxall" style="height:340px">
+            <div class="boxall" style="height:360px">
               <div class="alltitle">语料收集趋势分析 (最近30天)</div>
               <div class="navboxall" id="echart3"></div>
             </div>
           </li>
           <li>
-            <div class="boxall" style="height:410px">
+            <div class="boxall" style="height:430px">
               <div class="alltitle">语料库国家分类</div>
               <div class="navboxall">
                 <table class="table1" width="100%" border="0" cellspacing="0" cellpadding="0">
@@ -670,8 +670,8 @@ function zb1() {
     const v2 = data.percentage // 转换为百分比
     const option = {
         series: [{
-            type: 'pie', radius: ['60%', '70%'], color: '#49bcf7', hoverAnimation: false,
-            label: { show: true, position: 'center', formatter: [`{a|${v1}份}`, `{b|占比${v2}%}`].join('\n'), rich: { a: { color: '#fff', fontSize: 20, lineHeight: 28 }, b: { color: '#aaa', fontSize: 12 } } },
+            type: 'pie', radius: ['70%', '80%'], color: '#49bcf7', hoverAnimation: false,
+            label: { show: true, position: 'center', formatter: [`{a|${v1}份}`, `{b|占比${v2}%}`].join('\n'), rich: { a: { color: '#fff', fontSize: 10, lineHeight: 28 }, b: { color: '#aaa', fontSize: 12 } } },
             data: [
                 { value: v2, name: '文本文件' },
                 { value: 100 - v2, name: '其他文件', label: { show: false }, itemStyle: { color: 'rgba(255,255,255,.2)' }, emphasis: { itemStyle: { color: '#fff' } } }
@@ -691,8 +691,8 @@ function zb2() {
     const v2 = data.percentage // 转换为百分比
     const option = {
         series: [{
-            type: 'pie', radius: ['60%', '70%'], color: '#cdba00', hoverAnimation: false,
-            label: { show: true, position: 'center', formatter: [`{a|${v1}份}`, `{b|占比${v2}%}`].join('\n'), rich: { a: { color: '#fff', fontSize: 20, lineHeight: 28 }, b: { color: '#aaa', fontSize: 12 } } },
+            type: 'pie', radius: ['70%', '80%'], color: '#cdba00', hoverAnimation: false,
+            label: { show: true, position: 'center', formatter: [`{a|${v1}份}`, `{b|占比${v2}%}`].join('\n'), rich: { a: { color: '#fff', fontSize: 10, lineHeight: 28 }, b: { color: '#aaa', fontSize: 12 } } },
             data: [
                 { value: v2, name: '音频文件' },
                 { value: 100 - v2, name: '其他文件', label: { show: false }, itemStyle: { color: 'rgba(255,255,255,.2)' }, emphasis: { itemStyle: { color: '#fff' } } }
@@ -712,8 +712,8 @@ function zb3() {
     const v2 = data.percentage // 转换为百分比
     const option = {
         series: [{
-            type: 'pie', radius: ['60%', '70%'], color: '#62c98d', hoverAnimation: false,
-            label: { show: true, position: 'center', formatter: [`{a|${v1}份}`, `{b|占比${v2}%}`].join('\n'), rich: { a: { color: '#fff', fontSize: 20, lineHeight: 28 }, b: { color: '#aaa', fontSize: 12 } } },
+            type: 'pie', radius: ['70%', '80%'], color: '#62c98d', hoverAnimation: false,
+            label: { show: true, position: 'center', formatter: [`{a|${v1}份}`, `{b|占比${v2}%}`].join('\n'), rich: { a: { color: '#fff', fontSize: 10, lineHeight: 28 }, b: { color: '#aaa', fontSize: 12 } } },
             data: [
                 { value: v2, name: '视频文件' },
                 { value: 100 - v2, name: '其他文件', label: { show: false }, itemStyle: { color: 'rgba(255,255,255,.2)' }, emphasis: { itemStyle: { color: '#fff' } } }
@@ -733,8 +733,8 @@ function zb4() {
     const v2 = data.percentage // 转换为百分比
     const option = {
         series: [{
-            type: 'pie', radius: ['60%', '70%'], color: '#62c98d', hoverAnimation: false,
-            label: { show: true, position: 'center', formatter: [`{a|${v1}份}`, `{b|占比${v2}%}`].join('\n'), rich: { a: { color: '#fff', fontSize: 20, lineHeight: 28 }, b: { color: '#aaa', fontSize: 12 } } },
+            type: 'pie', radius: ['70%', '80%'], color: '#62c98d', hoverAnimation: false,
+            label: { show: true, position: 'center', formatter: [`{a|${v1}份}`, `{b|占比${v2}%}`].join('\n'), rich: { a: { color: '#fff', fontSize: 10, lineHeight: 28 }, b: { color: '#aaa', fontSize: 12 } } },
             data: [
                 { value: v2, name: '图像文件' },
                 { value: 100 - v2, name: '其他文件', label: { show: false }, itemStyle: { color: 'rgba(255,255,255,.2)' }, emphasis: { itemStyle: { color: '#fff' } } }
