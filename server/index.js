@@ -40,6 +40,52 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, configured: Boolean(process.env.DASHSCOPE_API_KEY && process.env.QWEN_MODEL) })
 })
 
+app.get('/api/geocode', async (req, res) => {
+  const address = typeof req.query.address === 'string' ? req.query.address.trim() : ''
+  const company = typeof req.query.company === 'string' ? req.query.company.trim() : ''
+  if (!address) return res.status(400).json({ error: '请提供企业所在地地址。' })
+  if (address.length > 300) return res.status(413).json({ error: '地址长度不能超过 300 个字符。' })
+  if (company.length > 120) return res.status(413).json({ error: '企业名称长度不能超过 120 个字符。' })
+  if (!process.env.AMAP_WEB_SERVICE_KEY) {
+    return res.status(503).json({ error: '未配置高德 Web 服务 Key；地图显示使用的 Web 端 Key 不能用于地址解析。' })
+  }
+
+  try {
+    if (company) {
+      const city = address.match(/[\u4e00-\u9fff]{2,10}(?:市|州|盟|地区)/)?.[0]
+      const searchParams = new URLSearchParams({ key: process.env.AMAP_WEB_SERVICE_KEY, keywords: company, output: 'JSON', offset: '20', page: '1' })
+      if (city) { searchParams.set('city', city); searchParams.set('citylimit', 'true') }
+      const searchResponse = await fetch(`https://restapi.amap.com/v3/place/text?${searchParams}`, { signal: AbortSignal.timeout(8000) })
+      if (searchResponse.ok) {
+        const searchPayload = await searchResponse.json()
+        const coreName = value => String(value || '').toLowerCase().replace(/[\s（）()·、，,]/g, '').replace(/股份有限公司|有限责任公司|有限公司|集团公司|集团|公司/g, '')
+        const targetName = coreName(company)
+        const matchingPoi = searchPayload.status === '1' && searchPayload.pois?.find(poi => {
+          const poiName = coreName(poi.name)
+          return poiName.length >= 3 && targetName.length >= 3 && (targetName.includes(poiName) || poiName.includes(targetName))
+        })
+        const [longitude, latitude] = String(matchingPoi?.location || '').split(',').map(Number)
+        if (Number.isFinite(longitude) && Number.isFinite(latitude)) {
+          return res.json({ longitude, latitude, level: '企业POI', formattedAddress: [matchingPoi.name, matchingPoi.address].filter(Boolean).join(' · ') })
+        }
+      }
+    }
+    const params = new URLSearchParams({ key: process.env.AMAP_WEB_SERVICE_KEY, address, output: 'JSON' })
+    const upstream = await fetch(`https://restapi.amap.com/v3/geocode/geo?${params}`, { signal: AbortSignal.timeout(8000) })
+    if (!upstream.ok) throw new Error(`AMap geocoder HTTP ${upstream.status}`)
+    const payload = await upstream.json()
+    const result = payload.status === '1' ? payload.geocodes?.[0] : null
+    const [longitude, latitude] = String(result?.location || '').split(',').map(Number)
+    if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+      return res.status(404).json({ error: payload.info || '高德未能解析该地址。' })
+    }
+    return res.json({ longitude, latitude, level: result.level || '', formattedAddress: result.formatted_address || address })
+  } catch (error) {
+    console.error('AMap geocode request failed:', error?.message || error)
+    return res.status(502).json({ error: '高德地址解析暂时失败，请检查 Web 服务 Key 和网络。' })
+  }
+})
+
 app.post('/api/semantic-parse', async (req, res) => {
   const text = typeof req.body?.text === 'string' ? req.body.text.trim() : ''
   if (!text) return res.status(400).json({ error: '请输入企业需求内容。' })
