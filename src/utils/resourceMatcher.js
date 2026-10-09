@@ -1,6 +1,7 @@
 // 资源需求匹配引擎（纯前端，规则驱动，不调用任何模型）
 // 数据来源：广西企业供需对接清单（36 家）+ 资源需求反向索引（19 条）
 import { ENTERPRISES, BACKUP, RESOURCE_INDEX } from '../data/supplyDemand.js'
+import { lookupEndowment } from '../data/resourceEndowment.js'
 
 /* ---------- 1. 输入关键词 → 归一化资源 ---------- */
 // 用户可能写行业/产品/原料的各种叫法，这里把它们归到语料里的资源口径上
@@ -170,7 +171,9 @@ export function runMatch(text) {
       // 找不到就只认归一化后完全同名的，宁缺毋滥
       const idx = RESOURCE_INDEX.find(x => x.companies && r.enterprises.some(n => x.companies.includes(n.slice(0, 8))))
         || RESOURCE_INDEX.find(x => canonResource(x.resource) === r.name)
-      return { ...r, evidence: idx || null }
+      // 供给侧：这份资源在广西 / 东盟哪里有、有多少（来自另一份公开数据）
+      const supply = lookupEndowment(r.name)
+      return { ...r, evidence: idx || null, supply }
     })
 
   return {
