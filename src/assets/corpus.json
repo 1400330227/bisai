@@ -1,0 +1,63 @@
+{
+  "countries": [
+    { "code": "CN", "name": "中国", "language": "中文" },
+    { "code": "BN", "name": "文莱", "language": "马来语" },
+    { "code": "KH", "name": "柬埔寨", "language": "柬埔寨语" },
+    { "code": "ID", "name": "印度尼西亚", "language": "印尼语" },
+    { "code": "LA", "name": "老挝", "language": "老挝语" },
+    { "code": "MY", "name": "马来西亚", "language": "马来语" },
+    { "code": "MM", "name": "缅甸", "language": "缅甸语" },
+    { "code": "PH", "name": "菲律宾", "language": "菲律宾语" },
+    { "code": "SG", "name": "新加坡", "language": "英语" },
+    { "code": "TH", "name": "泰国", "language": "泰语" },
+    { "code": "VN", "name": "越南", "language": "越南语" },
+    { "code": "TL", "name": "东帝汶", "language": "德顿语" },
+    { "code": "JP", "name": "日本", "language": "日语" },
+    { "code": "KR", "name": "韩国", "language": "韩语" },
+    { "code": "US", "name": "美国", "language": "英语" },
+    { "code": "GB", "name": "英国", "language": "英语" },
+    { "code": "FR", "name": "法国", "language": "法语" },
+    { "code": "DE", "name": "德国", "language": "德语" },
+    { "code": "RU", "name": "俄罗斯", "language": "俄语" }
+  ],
+  "domains": [
+    { "domainName": "教育" },
+    { "domainName": "新闻" },
+    { "domainName": "法律" },
+    { "domainName": "医疗" },
+    { "domainName": "科技" },
+    { "domainName": "财经" },
+    { "domainName": "文化" },
+    { "domainName": "旅游" },
+    { "domainName": "体育" },
+    { "domainName": "娱乐" },
+    { "domainName": "政府公文" },
+    { "domainName": "社交媒体" }
+  ],
+  "classifications": [
+    { "classificationName": "价值观语料" },
+    { "classificationName": "常规语料" },
+    { "classificationName": "对照语料" },
+    { "classificationName": "标注语料" },
+    { "classificationName": "翻译语料" }
+  ],
+  "languages": [
+    { "language": "中文" },
+    { "language": "英语" },
+    { "language": "越南语" },
+    { "language": "泰语" },
+    { "language": "印尼语" },
+    { "language": "马来语" },
+    { "language": "缅甸语" },
+    { "language": "柬埔寨语" },
+    { "language": "老挝语" },
+    { "language": "菲律宾语" },
+    { "language": "德顿语" },
+    { "language": "日语" },
+    { "language": "韩语" },
+    { "language": "法语" },
+    { "language": "俄语" },
+    { "language": "德语" },
+    { "language": "西班牙语" }
+  ]
+}
