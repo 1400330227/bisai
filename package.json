@@ -8,10 +8,12 @@
     "dev:web": "vite",
     "dev:api": "node server/index.js",
     "build": "vite build",
+    "graph:export": "node scripts/export-knowledge-graph.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "latest",
+    "d3": "^7.9.0",
     "dotenv": "^18.0.6",
     "express": "^5.2.1",
     "leaflet": "^1.9.4",
