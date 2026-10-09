@@ -3,9 +3,10 @@
 // 输入企业简介 / 资源需求 → 走一遍模拟检索 → 给出可能需要的矿产与自然资源
 import { ref, computed, nextTick } from 'vue'
 import {
-  Send, Sparkles, Layers3, MapPin, Check, Loader2, AlertCircle, RotateCcw, Database,
+  Send, Sparkles, Layers3, MapPin, Check, Loader2, AlertCircle, RotateCcw, Database, FileUp,
 } from 'lucide-vue-next'
 import { runMatch, EXAMPLES } from '../utils/resourceMatcher.js'
+import ResourceMap from './ResourceMap.vue'
 
 const STEPS = [
   '解析企业画像与工艺关键词',
@@ -14,26 +15,47 @@ const STEPS = [
   '汇总推荐资源清单',
 ]
 
-const messages = ref([])        // { role:'user'|'bot', text?, result?, pending?, steps:[] }
+const messages = ref([])        // { role:'user'|'bot', text?, file?, result?, pending?, steps:[] }
 const draft = ref('')
 const busy = ref(false)
 const threadEl = ref(null)
+const fileInput = ref(null)
+const fileNote = ref('')
 
 const canSend = computed(() => draft.value.trim().length > 0 && !busy.value)
 
 const wait = ms => new Promise(r => setTimeout(r, ms))
+
+/* 上传文档：纯 UI 演示，没有真实的大模型调用
+   txt/md/csv 直接读文本送识别；doc/docx/pdf 这类二进制文档只取文件名 */
+const TEXT_EXT = /\.(txt|md|csv|json|log)$/i
+async function onFile(e) {
+  const f = e.target.files && e.target.files[0]
+  e.target.value = ''
+  if (!f || busy.value) return
+  if (TEXT_EXT.test(f.name)) {
+    const content = await f.text()
+    fileNote.value = '已读取文档「' + f.name + '」（' + content.length + ' 字）'
+    submit(content.slice(0, 3000), f.name)
+  } else {
+    fileNote.value = '已接收「' + f.name + '」（二进制文档，UI 演示以文件名识别）'
+    submit(f.name, f.name)
+  }
+}
+function pickFile() { if (!busy.value && fileInput.value) fileInput.value.click() }
 
 async function scrollBottom() {
   await nextTick()
   if (threadEl.value) threadEl.value.scrollTop = threadEl.value.scrollHeight
 }
 
-async function submit(text) {
+async function submit(text, fileName) {
   const q = (text ?? draft.value).trim()
   if (!q || busy.value) return
   busy.value = true
+  if (!fileName) fileNote.value = ''
   draft.value = ''
-  messages.value.push({ role: 'user', text: q })
+  messages.value.push({ role: 'user', text: q, file: fileName || null })
   messages.value.push({ role: 'bot', pending: true, steps: STEPS.map(s => ({ label: s, done: false })) })
   // 注意：必须从数组里取回响应式代理再改。直接改上面那个字面量对象，
   // 改的是原始 target，不会触发依赖更新，进度条会永远停在第一步。
@@ -71,6 +93,8 @@ function onKeydown(e) {
 
 <template>
   <div class="ask">
+    <input ref="fileInput" type="file" class="sr-only"
+           accept=".txt,.md,.csv,.json,.log,.doc,.docx,.pdf" @change="onFile" />
     <!-- 空态：居中欢迎 + 输入框 -->
     <div v-if="!messages.length" class="hero">
       <div class="hero-badge"><MapPin :size="15" />广西 · 东盟资源协同</div>
@@ -88,6 +112,9 @@ function onKeydown(e) {
           @keydown="onKeydown"
         ></textarea>
         <div class="composer-foot">
+          <button class="chip as-btn" type="button" title="上传公司简介文档（txt / md / csv / docx / pdf）" @click="pickFile">
+            <FileUp :size="13" />上传文档
+          </button>
           <span class="chip"><Database :size="13" />企业档案 41 家</span>
           <span class="chip"><Layers3 :size="13" />资源索引 19 类</span>
           <button class="send" :disabled="!canSend" title="发送" @click="submit()">
@@ -95,6 +122,7 @@ function onKeydown(e) {
           </button>
         </div>
       </div>
+      <p v-if="fileNote" class="file-note">{{ fileNote }}</p>
 
       <div class="examples">
         <button v-for="ex in EXAMPLES" :key="ex.text" class="example" @click="submit(ex.text)">
@@ -107,7 +135,10 @@ function onKeydown(e) {
     <div v-else class="chat">
       <div ref="threadEl" class="thread">
         <div v-for="(m, i) in messages" :key="i" class="msg" :class="m.role">
-          <div v-if="m.role === 'user'" class="bubble user-bubble">{{ m.text }}</div>
+          <div v-if="m.role === 'user'" class="bubble user-bubble">
+            <span v-if="m.file" class="file-chip"><FileUp :size="12" />{{ m.file }}</span>
+            <span class="user-text">{{ m.text }}</span>
+          </div>
 
           <div v-else class="bubble bot-bubble">
             <!-- 检索进度 -->
@@ -156,10 +187,13 @@ function onKeydown(e) {
                   </div>
                 </div>
 
+                <ResourceMap :items="m.result.enterprises" />
+
                 <h3 class="sec-h">同类企业参考 <small>（{{ m.result.pool.matched }} 家高度相关）</small></h3>
                 <div class="ent-list">
-                  <div v-for="e in m.result.enterprises" :key="e.name" class="ent-row">
+                  <div v-for="(e, ei) in m.result.enterprises" :key="e.name" class="ent-row">
                     <div class="ent-top">
+                      <span class="ent-idx">{{ ei + 1 }}</span>
                       <strong>{{ e.name }}</strong>
                       <span class="ent-cert" :class="e.certainty.startsWith('高') ? 'hi' : 'mid'">确定性 {{ e.certainty.split('（')[0] }}</span>
                     </div>
@@ -188,9 +222,11 @@ function onKeydown(e) {
         ></textarea>
         <div class="composer-foot">
           <button class="ghost" title="清空对话" @click="reset"><RotateCcw :size="13" />重新开始</button>
+          <button class="chip as-btn" type="button" title="上传公司简介文档" @click="pickFile"><FileUp :size="13" /></button>
           <button class="send" :disabled="!canSend" title="发送" @click="submit()"><Send :size="16" /></button>
         </div>
       </div>
+      <p v-if="fileNote" class="file-note">{{ fileNote }}</p>
     </div>
   </div>
 </template>
@@ -213,6 +249,13 @@ function onKeydown(e) {
 .composer textarea::placeholder { color: #a3ada8; }
 .composer-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: #7b8982; background: #f6f8f7; border: 1px solid #eef1ef; padding: 4px 9px; border-radius: 999px; }
+.chip.as-btn { cursor: pointer; font-family: inherit; transition: .18s; }
+.chip.as-btn:hover { background: #eef5f1; border-color: #d5e4db; color: #376a4d; }
+.file-note { margin: 6px 4px 0; font-size: 10px; color: #94a29b; }
+.file-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; background: rgba(255, 255, 255, .18); border: 1px solid rgba(255, 255, 255, .3); padding: 2px 8px; border-radius: 999px; margin-right: 8px; vertical-align: 1px; }
+.user-text { white-space: pre-wrap; word-break: break-word; }
+.ent-idx { flex: none; width: 18px; height: 18px; border-radius: 5px; background: #2f6f52; color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .send { margin-left: auto; width: 34px; height: 34px; border: 0; border-radius: 50%; display: grid; place-items: center; background: #346f57; color: #fff; transition: .18s; }
 .send:hover:not(:disabled) { background: #2c604b; }
 .send:disabled { background: #dfe6e2; color: #a9b5af; cursor: default; }
