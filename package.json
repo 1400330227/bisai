@@ -8,6 +8,7 @@
     "dev:web": "vite",
     "dev:api": "node server/index.js",
     "build": "vite build",
+    "build:aci": "vite build --base=/aci/",
     "graph:export": "node scripts/export-knowledge-graph.mjs",
     "preview": "vite preview"
   },

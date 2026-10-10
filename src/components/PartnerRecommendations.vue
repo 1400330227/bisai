@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Building2, MapPinned, Route, Layers3, Pickaxe, ArrowRight } from 'lucide-vue-next'
+import { Building2, MapPinned, Route, Layers3, Pickaxe, ArrowRight, Info } from 'lucide-vue-next'
+import { certaintyTone } from '../utils/certainty'
 
 const props = defineProps({
   companies: { type: Array, required: true },
@@ -39,6 +40,10 @@ const provinceCoordinates = {
   '江西省':[115.86,28.68], '湖北省':[114.30,30.59],
 }
 const geocodedLocations = ref({})
+const validCoordinates = location => Number.isFinite(location?.longitude)
+  && Number.isFinite(location?.latitude)
+  && Math.abs(location.longitude) <= 180
+  && Math.abs(location.latitude) <= 90
 const amapPrecision = label => /POI/.test(String(label || '')) ? '企业位置' : /门牌|兴趣点|道路|街道|园区/.test(String(label || '')) ? '详细地址/园区' : /乡镇/.test(String(label || '')) ? '乡镇位置' : /区|县/.test(String(label || '')) ? '区县位置' : '市级位置'
 const countryOf = company => {
   const value = String(company?.location || '')
@@ -50,7 +55,7 @@ const countryOf = company => {
 }
 const locationOf = company => {
   const stored = geocodedLocations.value[company?.id]
-  if (stored) return stored
+  if (validCoordinates(stored)) return stored
   const value = String(company?.location || '')
   const city = Object.keys(cityCoordinates).find(name => value.includes(name))
   const country = countryOf(company)
@@ -90,7 +95,7 @@ const visibleMapCompanies = computed(() => queryMode.value === 'company'
       ...recommendations.value.map(item => ({ ...item, mapRole:item.id === activePartner.value?.id ? 'activePartner' : 'partner' })),
     ]
   : resourceMatches.value.map(item => ({ ...item, mapRole:'activeResource' })))
-const mapPins = computed(() => visibleMapCompanies.value.reduce((groups,company) => {
+const mapPins = computed(() => visibleMapCompanies.value.filter(company => validCoordinates(company.location)).reduce((groups,company) => {
   const key = `${company.location.longitude},${company.location.latitude}`
   const group = groups.find(item => item.key === key)
   if (group) group.companies.push(company)
@@ -101,11 +106,12 @@ const mapPins = computed(() => visibleMapCompanies.value.reduce((groups,company)
 let mapInstance
 let AMap
 let infoWindow
+let mapReady = false
 const geocodeCache = new Map()
-// v5 drops the old city-centre-only cache produced while address resolution was skipped.
-const cacheKey = 'gx-resource-amap-geocode-v5'
+// Ignore malformed results that an old deployment may have cached from an HTML API fallback.
+const cacheKey = 'gx-resource-amap-geocode-v6'
 const loadGeocodeCache = () => {
-  try { Object.entries(JSON.parse(localStorage.getItem(cacheKey) || '{}')).forEach(([key,value]) => geocodeCache.set(key,value)) } catch { /* ignore malformed cache */ }
+  try { Object.entries(JSON.parse(localStorage.getItem(cacheKey) || '{}')).forEach(([key,value]) => { if (validCoordinates(value)) geocodeCache.set(key,value) }) } catch { /* ignore malformed cache */ }
 }
 const saveGeocodeCache = () => {
   try { localStorage.setItem(cacheKey, JSON.stringify(Object.fromEntries(geocodeCache))) } catch { /* storage may be unavailable */ }
@@ -129,11 +135,12 @@ const geocodeAddress = async company => {
   if (!source) return null
   const lookupKey = `${company.name}::${source}`
   const cache = geocodeCache.get(lookupKey)
-  if (cache) return cache
+  if (validCoordinates(cache)) return cache
   const query = new URLSearchParams({ address:source, company:company.name })
-  const response = await fetch(`/api/geocode?${query}`)
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(payload.error || '地址解析失败')
+  const response = await fetch(`${import.meta.env.BASE_URL}api/geocode?${query}`)
+  const payload = await response.json().catch(() => null)
+  if (!payload || typeof payload !== 'object') throw new Error(`地址解析接口未返回 JSON，请检查 ${import.meta.env.BASE_URL}api/ 的反向代理配置`)
+  if (!response.ok) throw new Error(payload.error || `地址解析失败（${response.status}）`)
   const found = {
     longitude:payload.longitude,
     latitude:payload.latitude,
@@ -141,6 +148,7 @@ const geocodeAddress = async company => {
     precision:amapPrecision(payload.level),
     geocodeLevel:payload.level,
   }
+  if (!validCoordinates(found)) throw new Error('地址解析接口返回了无效坐标，请检查接口数据与反向代理配置')
   geocodeCache.set(lookupKey,found)
   saveGeocodeCache()
   return found
@@ -187,7 +195,7 @@ const changeResource = async () => {
   focusCompany(activeResourceCompany.value)
 }
 const renderMapMarkers = (fitAll = false) => {
-  if (!mapInstance || !AMap) return
+  if (!mapReady || !mapInstance || !AMap) return
   mapInstance.clearMap()
   const markers = []
   mapPins.value.forEach(pin => {
@@ -226,8 +234,9 @@ const renderMapMarkers = (fitAll = false) => {
   }
 }
 const focusCompany = company => {
-  if (!company || !mapInstance) return
-  const location = Number.isFinite(company.location?.latitude) ? company.location : locationOf(company)
+  if (!company || !mapReady || !mapInstance) return
+  const location = validCoordinates(company.location) ? company.location : locationOf(company)
+  if (!validCoordinates(location)) return
   pendingFocusCompanyId.value = String(location.precision || '').includes('待精确解析') ? company.id : ''
   mapInstance.setZoomAndCenter(16,[location.longitude,location.latitude],true,450)
 }
@@ -257,15 +266,24 @@ onMounted(async () => {
     AMap = await loadAmap()
     mapInstance = new AMap.Map(mapElement.value,{ viewMode:'2D', zoom:5, center:[110,16], resizeEnable:true })
     infoWindow = new AMap.InfoWindow({ offset:new AMap.Pixel(0,-28), closeWhenClickMap:true })
-    renderMapMarkers(true)
-    resolveVisibleLocations()
-    mapInstance.on('complete', () => { tileError.value = false })
+    mapInstance.on('complete', () => {
+      if (!mapInstance) return
+      tileError.value = false
+      mapReady = true
+      try {
+        renderMapMarkers(true)
+        resolveVisibleLocations()
+      } catch (error) {
+        console.error('Recommendation map overlays failed:', error)
+        mapError.value = error?.message || '地图标注暂时无法显示；企业列表仍可使用。'
+      }
+    })
   } catch (error) {
     console.error('Recommendation map initialization failed:', error)
     mapError.value = error?.message || '地图暂时无法初始化；企业需求与推荐结果仍可使用。'
   }
 })
-onBeforeUnmount(() => { mapInstance?.destroy(); mapInstance = undefined })
+onBeforeUnmount(() => { mapReady = false; mapInstance?.destroy(); mapInstance = undefined })
 </script>
 
 <template>
@@ -288,7 +306,7 @@ onBeforeUnmount(() => { mapInstance?.destroy(); mapInstance = undefined })
 
     <div class="partner-layout">
       <section class="panel partner-list-panel">
-        <div class="partner-section-heading"><div><h2>{{ queryMode==='company' ? '潜在合作方与对接路径' : `${selectedResource}需求企业` }}</h2><p>{{ queryMode==='company' ? '按共同需求资源、产业和区域关联度排序' : '列出供需清单中需要该资源的企业，点击可定位地图' }}</p></div><Route :size="20"/></div>
+        <div class="partner-section-heading"><div><h2><Route :size="17"/>{{ queryMode==='company' ? '潜在合作方与对接路径' : `${selectedResource}需求企业` }}</h2><p><Info :size="14"/>{{ queryMode==='company' ? '按共同需求资源、产业和区域关联度排序' : '列出供需清单中需要该资源的企业，点击可定位地图' }}</p></div></div>
 
         <template v-if="queryMode==='company'">
           <div v-if="activePartner" class="partner-route-focus"><div class="partner-route-label"><span>当前对接路径</span><strong>{{ activePartner.basis }}</strong></div><div class="partner-route-text">{{ activePartner.route }}</div></div>
@@ -303,14 +321,14 @@ onBeforeUnmount(() => { mapInstance?.destroy(); mapInstance = undefined })
 
         <div v-else class="partner-result-list resource-result-list">
           <button v-for="(company,index) in resourceMatches" :key="company.id" class="partner-result" :class="{ active:activeResourceCompany?.id===company.id }" @click="selectedResourceCompanyId=company.id;focusCompany(company)">
-            <span class="partner-rank">{{ String(index+1).padStart(2,'0') }}</span><span class="partner-result-main"><strong>{{ company.name }}</strong><small>{{ company.industry }} · {{ company.location.label }}</small><span class="partner-result-route"><i>需求 {{ selectedResource }}</i>{{ company.demand }}</span></span><span class="partner-score">确定性<b>{{ company.certainty || '待核实' }}</b></span>
+            <span class="partner-rank">{{ String(index+1).padStart(2,'0') }}</span><span class="partner-result-main"><strong>{{ company.name }}</strong><small>{{ company.industry }} · {{ company.location.label }}</small><span class="partner-result-route"><i>需求 {{ selectedResource }}</i>{{ company.demand }}</span></span><span class="partner-score">确定性<span class="certainty-badge" :class="certaintyTone(company.certainty)">{{ company.certainty || '待核实' }}</span></span>
           </button>
           <div v-if="!resourceMatches.length" class="partner-empty">当前资源暂无企业需求记录。</div>
         </div>
       </section>
 
       <section class="panel partner-map-panel">
-        <div class="partner-section-heading"><div><h2>{{ queryMode==='company' ? '推荐企业所在地' : '资源需求企业分布' }}</h2><p>高德地图按企业所在地地址解析；地址信息不足时显示到市县，并标注定位精度</p></div><MapPinned :size="20"/></div>
+        <div class="partner-section-heading"><div><h2><MapPinned :size="17"/>{{ queryMode==='company' ? '推荐企业所在地' : '资源需求企业分布' }}</h2><p><Info :size="14"/>高德地图按企业所在地地址解析；地址信息不足时显示到市县，并标注定位精度</p></div></div>
         <div class="partner-map-legend"><span><i class="map-dot primary"></i>{{ queryMode==='company' ? '当前企业' : '当前资源需求企业' }}</span><span v-if="queryMode==='company'"><i class="map-dot partner"></i>潜在合作方</span><span class="map-region-label">{{ geocoding ? '正在解析企业地址…' : `${mapPins.length} 个标注位置 · 可缩放拖动` }}</span></div>
         <div ref="mapElement" class="partner-map-canvas" aria-label="企业真实地图位置" role="application"></div>
         <p v-if="mapError" class="partner-map-message">{{ mapError }}</p><p v-else-if="tileError" class="partner-map-message">高德地图暂不可用，请检查网络或确认 Key 配置；企业推荐列表仍可使用。</p>
@@ -326,5 +344,63 @@ onBeforeUnmount(() => { mapInstance?.destroy(); mapInstance = undefined })
 .partner-page :deep(.company-map-marker.current){background:#c49b4c;transform:rotate(-45deg) scale(1.12)}
 .partner-page :deep(.company-map-marker.selectedPartner){background:#4c86bd;transform:rotate(-45deg) scale(1.12)}.partner-page :deep(.company-map-marker.selected-contains)::before{content:"";position:absolute;inset:-5px;border:2px solid #4c86bd;border-radius:50% 50% 50% 0;transform:rotate(0deg)}
 .partner-map-message{margin:8px 0 0;color:#9b715d;font-size:11px;line-height:1.5}
+/* Blue-white-navy theme for partner recommendations */
+.partner-page{gap:16px;color:#172033}
+.partner-toolbar{border-color:#d8e1ef;background:linear-gradient(110deg,#fff,#f7f9fd);box-shadow:0 4px 14px #14264a08}
+.partner-query-tabs{padding:4px;border-color:#d7e1f0;border-radius:9px;background:#edf2fa}
+.partner-query-tabs button{height:34px;border-radius:7px;color:#53627a;font-weight:550}
+.partner-query-tabs button.active{background:#fff;color:#1748a5;box-shadow:0 2px 7px #10213d18}
+.partner-query-picker>span{color:#334560;font-weight:600}
+.partner-query-picker .native-select{border-color:#d6e0ef;background-color:#fff;color:#1e2f4b}
+.partner-summary{color:#66758d}.partner-summary svg{color:#2563eb}.partner-summary b{color:#1748b5}
+.company-needs{border-color:#dce4ef;background:#fff}
+.company-needs>div strong{color:#172b50}.company-needs>div span{color:#687891}
+.need-chip{border-color:#d7e2f2;background:#f5f8fe;color:#285292}.need-chip svg{color:#2563eb}
+.partner-list-panel,.partner-map-panel{border-color:#d9e1ed;background:#fff;box-shadow:0 4px 14px #14264a09}
+.partner-section-heading>svg{color:#2563eb}
+.partner-section-heading h2{color:#111827}
+.partner-section-heading p{color:#5c6b83}
+.partner-route-focus{border-color:#cbd9f0;background:linear-gradient(120deg,#edf3ff,#f9fbff)}
+.partner-route-label{color:#536783}.partner-route-label strong{color:#1748b5}
+.partner-route-text{color:#263b5d}
+.partner-result-list{scrollbar-color:#9eb5db #f2f5fa}
+.partner-result{border-color:#e3e9f2;background:#fff}
+.partner-result:hover,.partner-result.active{background:#f3f7ff}
+.partner-result.active{box-shadow:inset 3px 0 #2563eb}
+.partner-rank{background:#eaf1ff;color:#1748b5;font-weight:700}
+.partner-result-main strong{color:#15233c}
+.partner-result-main small{color:#5e6d84}
+.partner-result-route{color:#53647e}
+.partner-result-route i{color:#1748b5;background:#eaf1ff}
+.partner-score{color:#63718a}.partner-score b{color:#1748b5}
+.partner-data-note,.partner-empty{color:#596a84}
+.partner-map-legend{color:#4c5e78}
+.map-dot.partner{background:#60a5fa}.map-dot.primary{background:#10213d}
+.map-region-label{color:#64748b}
+.partner-map-canvas{border-color:#d8e1ed;background:#eef3fa}
+.partner-map-detail{border-color:#dce4ef;color:#52627a}
+.partner-map-detail>span:first-child{color:#1748b5}
+.partner-map-detail button{color:#1748b5}
+.partner-map-message{color:#334d78}
+.recommendation-network{background:radial-gradient(ellipse at center,#edf3ff,#f9fbff 72%);border:1px solid #e0e8f4;border-radius:10px}
+.rec-svg-links line{stroke:#7d9ac6}
+.rec-svg-node circle{fill:#f7f9fd;stroke:#7c95bd}
+.rec-svg-node.source circle{fill:#eaf1ff;stroke:#2563eb}
+.rec-svg-node.company circle{fill:#f0f4fa;stroke:#8295b3}
+.rec-svg-node.resource-source-svg circle{fill:#e9f3ff;stroke:#4382dc}
+.rec-svg-node text{fill:#1b2d4a}
+.rec-svg-node:focus circle,.rec-svg-node:hover circle{stroke:#1748b5;fill:#e6efff}
+.recommendation-tooltip{border-color:#cbd9ed;background:#fff;color:#425675;box-shadow:0 8px 24px #10213d1c}
+.recommendation-tooltip strong{color:#142747}
+.recommend-legend{border-color:#e0e7f0;background:rgba(255,255,255,.97);color:#52627a}
+.partner-page :deep(.company-map-marker:not(.source):not(.resource)){background:#4b8ff0}
+.partner-page :deep(.company-map-marker.source){background:#142b51}
+.partner-page :deep(.company-map-marker.resource){background:#2563eb}
+.partner-page :deep(.company-map-marker.current){background:#10213d}
+.partner-page :deep(.company-map-marker.selectedPartner){background:#2563eb}
+.partner-page :deep(.company-map-marker b){background:#10213d}
+.partner-page :deep(.company-map-popup>strong){color:#142747}
+.partner-page :deep(.company-map-popup button){border-color:#e3e9f2;color:#263b5d}
+.partner-page :deep(.company-map-popup button:hover){background:#eef4ff}
 @media(max-width:1100px){.partner-layout{grid-template-columns:1fr}.partner-toolbar{align-items:stretch;flex-wrap:wrap}.partner-query-picker{flex-basis:calc(100% - 18px)}.partner-query-picker .native-select{max-width:none}.partner-map-canvas{height:390px}.partner-summary{margin-left:4px}}
 </style>

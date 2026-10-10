@@ -7,6 +7,7 @@ import {
 } from 'lucide-vue-next'
 import { runMatch, EXAMPLES } from '../utils/resourceMatcher.js'
 import ResourceMap from './ResourceMap.vue'
+import { certaintyTone } from '../utils/certainty'
 
 const STEPS = [
   '解析企业画像与工艺关键词',
@@ -212,7 +213,7 @@ function onKeydown(e) {
                     <div class="ent-top">
                       <span class="ent-idx">{{ ei + 1 }}</span>
                       <strong>{{ e.name }}</strong>
-                      <span class="ent-cert" :class="e.certainty.startsWith('高') ? 'hi' : 'mid'">确定性 {{ e.certainty.split('（')[0] }}</span>
+                      <span class="certainty-badge" :class="certaintyTone(e.certainty)">确定性 {{ e.certainty || '待核实' }}</span>
                     </div>
                     <div class="ent-meta">{{ e.group }} · {{ e.place }}</div>
                     <div class="ent-needs">{{ e.needs.join('、') }}</div>
@@ -331,9 +332,6 @@ function onKeydown(e) {
 .ent-row { padding: 10px 12px; border: 1px solid #eef1ef; border-radius: 10px; }
 .ent-top { display: flex; align-items: center; gap: 8px; }
 .ent-top strong { font-size: 12px; color: #2c3f36; font-weight: 600; }
-.ent-cert { font-size: 9.5px; padding: 2px 7px; border-radius: 999px; }
-.ent-cert.hi { color: #376a4d; background: #edf5f0; }
-.ent-cert.mid { color: #8a7a52; background: #f8f5ec; }
 .ent-meta { font-size: 10.5px; color: #98a29d; margin-top: 4px; }
 .ent-needs { font-size: 11px; color: #5f7a6d; margin-top: 5px; }
 .ent-scale { font-size: 10.5px; color: #8d9a94; margin-top: 4px; line-height: 1.6; }

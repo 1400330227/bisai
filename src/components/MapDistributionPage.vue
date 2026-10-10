@@ -2,13 +2,14 @@
 // 「地图可视化 → 资源分布图」
 // 地图本身是一个自包含的单文件页面（放在 public/ 下，Vite 会原样拷进 dist/），
 // 这里只做一层容器 + iframe 嵌入，不把它的逻辑搬进 Vue。
+const resourceMapUrl = `${import.meta.env.BASE_URL}resource-map.html`
 </script>
 
 <template>
   <div class="map-panel">
     <iframe
       class="map-frame"
-      src="/resource-map.html"
+      :src="resourceMapUrl"
       title="广西及东盟资源分布图"
     ></iframe>
   </div>

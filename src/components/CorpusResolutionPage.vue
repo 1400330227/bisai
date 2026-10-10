@@ -19,7 +19,7 @@ const reset = () => { resolved.value = false }
 </script>
 
 <template>
-  <div class="process-layout corpus-step-layout">
+  <div class="process-layout corpus-step-layout resolution-page">
     <section class="panel process-panel">
       <div class="panel-heading"><div><h2>抽取结果消解</h2><p>对实体关系去重、校验并判断语料可用性</p></div></div>
       <div class="vector-summary"><div class="vector-icon"><SlidersHorizontal :size="22"/></div><div><strong>待消解数据</strong><span>146 个实体 · 218 条关系 · 30 份来源资料</span></div></div>

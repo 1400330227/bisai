@@ -5,6 +5,14 @@ import OpenAI from 'openai'
 const app = express()
 const port = Number(process.env.API_PORT || 3001)
 app.use(express.json({ limit: '32kb' }))
+const parseCoordinates = value => {
+  const [longitudeText, latitudeText] = String(value ?? '').split(',')
+  if (!longitudeText?.trim() || !latitudeText?.trim()) return null
+  const longitude = Number(longitudeText), latitude = Number(latitudeText)
+  return Number.isFinite(longitude) && Number.isFinite(latitude)
+    && Math.abs(longitude) <= 180 && Math.abs(latitude) <= 90
+    ? { longitude, latitude } : null
+}
 
 const demandSchema = {
   type: 'object',
@@ -64,9 +72,9 @@ app.get('/api/geocode', async (req, res) => {
           const poiName = coreName(poi.name)
           return poiName.length >= 3 && targetName.length >= 3 && (targetName.includes(poiName) || poiName.includes(targetName))
         })
-        const [longitude, latitude] = String(matchingPoi?.location || '').split(',').map(Number)
-        if (Number.isFinite(longitude) && Number.isFinite(latitude)) {
-          return res.json({ longitude, latitude, level: '企业POI', formattedAddress: [matchingPoi.name, matchingPoi.address].filter(Boolean).join(' · ') })
+        const coordinates = parseCoordinates(matchingPoi?.location)
+        if (coordinates) {
+          return res.json({ ...coordinates, level: '企业POI', formattedAddress: [matchingPoi.name, matchingPoi.address].filter(Boolean).join(' · ') })
         }
       }
     }
@@ -75,11 +83,11 @@ app.get('/api/geocode', async (req, res) => {
     if (!upstream.ok) throw new Error(`AMap geocoder HTTP ${upstream.status}`)
     const payload = await upstream.json()
     const result = payload.status === '1' ? payload.geocodes?.[0] : null
-    const [longitude, latitude] = String(result?.location || '').split(',').map(Number)
-    if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+    const coordinates = parseCoordinates(result?.location)
+    if (!coordinates) {
       return res.status(404).json({ error: payload.info || '高德未能解析该地址。' })
     }
-    return res.json({ longitude, latitude, level: result.level || '', formattedAddress: result.formatted_address || address })
+    return res.json({ ...coordinates, level: result.level || '', formattedAddress: result.formatted_address || address })
   } catch (error) {
     console.error('AMap geocode request failed:', error?.message || error)
     return res.status(502).json({ error: '高德地址解析暂时失败，请检查 Web 服务 Key 和网络。' })
