@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard-landing">
     <div class="fullscreen">
-      <div class="loading" ref="loadingEl">
+      <div class="loading" >
         <div class="loadbox"><span class="load-spin"></span> 页面加载中...</div>
       </div>
       <div class="head">

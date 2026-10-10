@@ -4,6 +4,7 @@
 import { ref, computed, nextTick } from 'vue'
 import {
   Send, Sparkles, Layers3, MapPin, Check, Loader2, AlertCircle, RotateCcw, Database, FileUp,
+  FileText, X,
 } from 'lucide-vue-next'
 import { runMatch, EXAMPLES } from '../utils/resourceMatcher.js'
 import ResourceMap from './ResourceMap.vue'
@@ -21,29 +22,37 @@ const draft = ref('')
 const busy = ref(false)
 const threadEl = ref(null)
 const fileInput = ref(null)
-const fileNote = ref('')
+// 上传的文件先挂在输入框里，**点提交才分析**；之后的分析都用这份文件
+const pendingFile = ref(null)   // { name, size, text, hint }
 
-const canSend = computed(() => draft.value.trim().length > 0 && !busy.value)
+const canSend = computed(() => (draft.value.trim().length > 0 || !!pendingFile.value) && !busy.value)
 
 const wait = ms => new Promise(r => setTimeout(r, ms))
 
-/* 上传文档：纯 UI 演示，没有真实的大模型调用
-   txt/md/csv 直接读文本送识别；doc/docx/pdf 这类二进制文档只取文件名 */
+function fmtSize(n) {
+  if (n == null) return ''
+  if (n < 1024) return n + ' B'
+  if (n < 1024 * 1024) return (n / 1024).toFixed(2) + ' KB'
+  return (n / 1024 / 1024).toFixed(2) + ' MB'
+}
+
+/* 上传文档：只把文件挂到输入框上，不立即分析（纯 UI 演示，没有真实的大模型调用）
+   txt/md/csv 直接读文本；doc/docx/pdf 这类二进制文档只取文件名 */
 const TEXT_EXT = /\.(txt|md|csv|json|log)$/i
 async function onFile(e) {
   const f = e.target.files && e.target.files[0]
   e.target.value = ''
-  if (!f || busy.value) return
+  if (!f) return
+  const size = fmtSize(f.size)
   if (TEXT_EXT.test(f.name)) {
     const content = await f.text()
-    fileNote.value = '已读取文档「' + f.name + '」（' + content.length + ' 字）'
-    submit(content.slice(0, 3000), f.name)
+    pendingFile.value = { name: f.name, size, text: content.slice(0, 3000), hint: '' }
   } else {
-    fileNote.value = '已接收「' + f.name + '」（二进制文档，UI 演示以文件名识别）'
-    submit(f.name, f.name)
+    pendingFile.value = { name: f.name, size, text: f.name, hint: '二进制文档，以文件名识别' }
   }
 }
 function pickFile() { if (!busy.value && fileInput.value) fileInput.value.click() }
+function removeFile() { if (!busy.value) pendingFile.value = null }
 
 /* 供给侧文案：广西 / 东盟 各自的合计与最大来源地。
    某一侧没有记录时明确说出来，避免被误读成"那边没有这个资源"。 */
@@ -64,13 +73,15 @@ async function scrollBottom() {
   if (threadEl.value) threadEl.value.scrollTop = threadEl.value.scrollHeight
 }
 
-async function submit(text, fileName) {
-  const q = (text ?? draft.value).trim()
-  if (!q || busy.value) return
+async function submit(text) {
+  const typed = (text ?? draft.value).trim()
+  const file = pendingFile.value
+  if ((!typed && !file) || busy.value) return
   busy.value = true
-  if (!fileName) fileNote.value = ''
+  // 挂了文件时，分析一律基于文件内容 —— 输入的文字照常显示在气泡里，但不参与分析（UI 演示）
+  const analyze = file ? file.text : typed
   draft.value = ''
-  messages.value.push({ role: 'user', text: q, file: fileName || null })
+  messages.value.push({ role: 'user', text: typed, file: file ? file.name : null, fromFile: file ? file.name : null })
   messages.value.push({ role: 'bot', pending: true, steps: STEPS.map(s => ({ label: s, done: false })) })
   // 注意：必须从数组里取回响应式代理再改。直接改上面那个字面量对象，
   // 改的是原始 target，不会触发依赖更新，进度条会永远停在第一步。
@@ -86,7 +97,8 @@ async function submit(text, fileName) {
     await scrollBottom()
   }
 
-  bot.result = runMatch(q)
+  bot.result = runMatch(analyze)
+  bot.basedOnFile = file ? file.name : null
   bot.pending = false
   busy.value = false
   await scrollBottom()
@@ -120,6 +132,15 @@ function onKeydown(e) {
       </p>
 
       <div class="composer hero-composer">
+        <!-- 上传的文件先挂在这里，点发送才分析 -->
+        <div v-if="pendingFile" class="attached">
+          <div class="att-icon"><FileText :size="18" /></div>
+          <div class="att-info">
+            <strong :title="pendingFile.name">{{ pendingFile.name }}</strong>
+            <span>{{ pendingFile.size }}<template v-if="pendingFile.hint"> · {{ pendingFile.hint }}</template></span>
+          </div>
+          <button class="att-del" type="button" title="移除附件" @click="removeFile"><X :size="14" /></button>
+        </div>
         <textarea
           v-model="draft"
           rows="2"
@@ -137,7 +158,6 @@ function onKeydown(e) {
           </button>
         </div>
       </div>
-      <p v-if="fileNote" class="file-note">{{ fileNote }}</p>
 
       <div class="examples">
         <button v-for="ex in EXAMPLES" :key="ex.text" class="example" @click="submit(ex.text)">
@@ -153,6 +173,7 @@ function onKeydown(e) {
           <div v-if="m.role === 'user'" class="bubble user-bubble">
             <span v-if="m.file" class="file-chip"><FileUp :size="12" />{{ m.file }}</span>
             <span class="user-text">{{ m.text }}</span>
+            <div v-if="m.fromFile" class="file-based">本次分析基于已上传的「{{ m.fromFile }}」</div>
           </div>
 
           <div v-else class="bubble bot-bubble">
@@ -232,6 +253,14 @@ function onKeydown(e) {
       </div>
 
       <div class="composer docked">
+        <div v-if="pendingFile" class="attached">
+          <div class="att-icon"><FileText :size="18" /></div>
+          <div class="att-info">
+            <strong :title="pendingFile.name">{{ pendingFile.name }}</strong>
+            <span>{{ pendingFile.size }}<template v-if="pendingFile.hint"> · {{ pendingFile.hint }}</template></span>
+          </div>
+          <button class="att-del" type="button" title="移除附件" @click="removeFile"><X :size="14" /></button>
+        </div>
         <textarea
           v-model="draft"
           rows="1"
@@ -244,7 +273,6 @@ function onKeydown(e) {
           <button class="send" :disabled="!canSend" title="发送" @click="submit()"><Send :size="16" /></button>
         </div>
       </div>
-      <p v-if="fileNote" class="file-note">{{ fileNote }}</p>
     </div>
   </div>
 </template>
@@ -269,9 +297,17 @@ function onKeydown(e) {
 .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: #7b8982; background: #f6f8f7; border: 1px solid #eef1ef; padding: 4px 9px; border-radius: 999px; }
 .chip.as-btn { cursor: pointer; font-family: inherit; transition: .18s; }
 .chip.as-btn:hover { background: #eef5f1; border-color: #d5e4db; color: #376a4d; }
-.file-note { margin: 6px 4px 0; font-size: 10px; color: #94a29b; }
+/* 挂在输入框里的附件卡片（上传后、提交前） */
+.attached { display: flex; align-items: center; gap: 9px; padding: 8px 10px; margin-bottom: 9px; background: #f7f9f8; border: 1px solid #eaf0ec; border-radius: 10px; text-align: left; }
+.att-icon { flex: none; width: 32px; height: 32px; border-radius: 8px; background: #e8f0fb; color: #2f6f9c; display: grid; place-items: center; }
+.att-info { min-width: 0; flex: 1; }
+.att-info strong { display: block; font-size: 12px; font-weight: 500; color: #2c3f36; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.att-info span { display: block; font-size: 10.5px; color: #9aa49f; margin-top: 1px; }
+.att-del { flex: none; width: 22px; height: 22px; border: 0; border-radius: 6px; background: transparent; color: #9aa49f; display: grid; place-items: center; cursor: pointer; transition: .15s; }
+.att-del:hover { background: #eef2f0; color: #5f6f68; }
 .file-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; background: rgba(255, 255, 255, .18); border: 1px solid rgba(255, 255, 255, .3); padding: 2px 8px; border-radius: 999px; margin-right: 8px; vertical-align: 1px; }
 .user-text { white-space: pre-wrap; word-break: break-word; }
+.file-based { margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, .28); font-size: 10px; color: rgba(255, 255, 255, .82); }
 .ent-idx { flex: none; width: 18px; height: 18px; border-radius: 5px; background: #2f6f52; color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .send { margin-left: auto; width: 34px; height: 34px; border: 0; border-radius: 50%; display: grid; place-items: center; background: #346f57; color: #fff; transition: .18s; }
