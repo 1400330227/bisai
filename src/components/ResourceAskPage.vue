@@ -21,6 +21,8 @@ const busy = ref(false)
 const threadEl = ref(null)
 const fileInput = ref(null)
 const fileNote = ref('')
+// 上传过的文件会记住：之后无论再输入什么文本，分析都基于这份文件（本页只做 UI 演示）
+const fileContext = ref(null)
 
 const canSend = computed(() => draft.value.trim().length > 0 && !busy.value)
 
@@ -35,10 +37,12 @@ async function onFile(e) {
   if (!f || busy.value) return
   if (TEXT_EXT.test(f.name)) {
     const content = await f.text()
-    fileNote.value = '已读取文档「' + f.name + '」（' + content.length + ' 字）'
-    submit(content.slice(0, 3000), f.name)
+    fileContext.value = { name: f.name, text: content.slice(0, 3000) }
+    fileNote.value = '已读取「' + f.name + '」（' + content.length + ' 字）· 之后的提问都基于这份文件'
+    submit(fileContext.value.text, f.name)
   } else {
-    fileNote.value = '已接收「' + f.name + '」（二进制文档，UI 演示以文件名识别）'
+    fileContext.value = { name: f.name, text: f.name }
+    fileNote.value = '已接收「' + f.name + '」（二进制文档，以文件名识别）· 之后的提问都基于这份文件'
     submit(f.name, f.name)
   }
 }
@@ -64,12 +68,16 @@ async function scrollBottom() {
 }
 
 async function submit(text, fileName) {
-  const q = (text ?? draft.value).trim()
-  if (!q || busy.value) return
+  const typed = (text ?? draft.value).trim()
+  if (!typed || busy.value) return
   busy.value = true
+  // 已经上传过文件时，分析一律基于那份文件的内容 —— 之后再输入什么文本都不影响结果。
+  // 输入的文本照常显示在气泡里，只是不参与分析（本页是 UI 演示）。
+  const analyze = fileContext.value ? fileContext.value.text : typed
+  const fromFile = (fileContext.value && !fileName) ? fileContext.value.name : null
   if (!fileName) fileNote.value = ''
   draft.value = ''
-  messages.value.push({ role: 'user', text: q, file: fileName || null })
+  messages.value.push({ role: 'user', text: typed, file: fileName || null, fromFile })
   messages.value.push({ role: 'bot', pending: true, steps: STEPS.map(s => ({ label: s, done: false })) })
   // 注意：必须从数组里取回响应式代理再改。直接改上面那个字面量对象，
   // 改的是原始 target，不会触发依赖更新，进度条会永远停在第一步。
@@ -85,7 +93,8 @@ async function submit(text, fileName) {
     await scrollBottom()
   }
 
-  bot.result = runMatch(q)
+  bot.result = runMatch(analyze)
+  bot.basedOnFile = fromFile
   bot.pending = false
   busy.value = false
   await scrollBottom()
@@ -152,6 +161,7 @@ function onKeydown(e) {
           <div v-if="m.role === 'user'" class="bubble user-bubble">
             <span v-if="m.file" class="file-chip"><FileUp :size="12" />{{ m.file }}</span>
             <span class="user-text">{{ m.text }}</span>
+            <div v-if="m.fromFile" class="file-based">本次分析基于已上传的「{{ m.fromFile }}」</div>
           </div>
 
           <div v-else class="bubble bot-bubble">
@@ -271,6 +281,7 @@ function onKeydown(e) {
 .file-note { margin: 6px 4px 0; font-size: 10px; color: #94a29b; }
 .file-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; background: rgba(255, 255, 255, .18); border: 1px solid rgba(255, 255, 255, .3); padding: 2px 8px; border-radius: 999px; margin-right: 8px; vertical-align: 1px; }
 .user-text { white-space: pre-wrap; word-break: break-word; }
+.file-based { margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, .28); font-size: 10px; color: rgba(255, 255, 255, .82); }
 .ent-idx { flex: none; width: 18px; height: 18px; border-radius: 5px; background: #2f6f52; color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .send { margin-left: auto; width: 34px; height: 34px; border: 0; border-radius: 50%; display: grid; place-items: center; background: #346f57; color: #fff; transition: .18s; }
