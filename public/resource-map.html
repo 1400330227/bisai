@@ -1337,22 +1337,25 @@ function paintPolys(){
     })));
   } catch(e){ console.warn('paintPolys', e); }
 }
-/* 灯泡图形：圆头灯体 + 底部螺口 + 高光；未披露用虚线空心 */
-function bulbSVG(r, main, deep, isNull, sel){
-  const pad = 5, W = r * 2 + pad * 2, sockH = Math.max(5, Math.round(r * 0.62));
-  const cx = W / 2, cy = r + pad, H = r * 2 + pad * 2 + sockH;
-  const body = isNull
-    ? 'fill="rgba(255,255,255,.95)" stroke="#94A3B8" stroke-width="1.8" stroke-dasharray="3 3"'
-    : 'fill="' + (sel ? deep : main) + '" stroke="#ffffff" stroke-width="2.2"';
-  const sock = isNull ? '#CBD5E1' : '#94A3B8';
-  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">'
-    + '<rect x="' + (cx - r * 0.5) + '" y="' + (cy + r - 1) + '" width="' + r + '" height="' + sockH + '" rx="2" fill="' + sock + '"/>'
-    + '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" ' + body + '/>'
-    + '<path d="M' + (cx - r * 0.45) + ' ' + (cy - r * 0.08) + ' a ' + (r * 0.45) + ' ' + (r * 0.45) + ' 0 0 1 ' + (r * 0.9) + ' 0"'
-    + ' fill="none" stroke="rgba(255,255,255,.8)" stroke-width="' + Math.max(1.2, r * 0.14).toFixed(1) + '" stroke-linecap="round"/>'
-    + '<line x1="' + (cx - r * 0.5) + '" y1="' + (cy + r + sockH * 0.45) + '" x2="' + (cx + r * 0.5) + '" y2="' + (cy + r + sockH * 0.45) + '"'
-    + ' stroke="rgba(255,255,255,.55)" stroke-width="1"/>'
-    + '</svg>';
+/* 灯泡图形：形状取自 05-灯泡.svg（viewBox 1024×1024，6 条路径）
+   第 2 条是灯体，颜色随资源/区域变化；其余（螺口/触点/描边/灯丝）保留原配色 */
+const BULB_PATHS = [
+  {d:'M634.9 770.3l-4.4 28H393.6l-4.4-28h245.7zM512 931c-30.4 0-55.9-21.6-62-50.2h124c-6.1 28.6-31.6 50.2-62 50.2z m103.5-79.3h-207c-3.4 0-6.4-2.2-7.4-5.5l-2.9-18.9H626l-3 18.9c-1 3.3-4 5.5-7.5 5.5zM384.7 741.3l-8.1-51.9-0.1-0.6c-7.4-30.4-22.6-58.6-43.8-81.7-42.5-46.2-65.9-106.1-65.9-168.7 0-135.1 109.9-245.1 245-245.3h0.3c134 0 244 108.9 245.3 242.9 0.6 62.7-22.5 122.6-65 168.6-21.5 23.2-36.8 51.7-44.3 82.4l-0.1 0.6-8.4 53.6H384.7z', c:'#FFFFFF'},
+  {d:'M357 741.1l-8-51.9-0.1-0.6c-7.4-30.4-22.4-58.6-43.5-81.7-42.2-46.2-65.4-106.1-65.4-168.7 0-135.1 109-245.1 243.1-245.3h0.3c133 0 242.1 108.9 243.3 242.9 0.6 62.7-22.3 122.6-64.5 168.6-21.3 23.2-36.5 51.7-43.9 82.4l-0.1 0.6-8.3 53.6H357z', c:'BODY'},
+  {d:'M605.8 770.8l-4.3 28H370.4l-4.3-28h239.7zM587 852.2H384.9c-3.3 0-6.3-2.2-7.2-5.5l-2.9-18.9h222.3l-2.9 18.9c-1 3.3-3.9 5.5-7.2 5.5z', c:'#E87A66'},
+  {d:'M484.9 931c-29 0-53.4-21.6-59.2-50.2H544c-5.8 28.6-30.1 50.2-59.1 50.2z', c:'#65D5EF'},
+  {d:'M512 164.1h-0.3c-73.2 0.1-142 28.6-193.7 80.4-51.7 51.8-80.2 120.6-80.2 193.9 0 35.2 6.6 69.7 19.7 102.6 12.7 31.8 30.8 60.7 53.8 85.7 17.8 19.3 30.5 42.9 36.8 68.4l24.5 157 0.1 0.6c4 16.5 18.7 28 35.7 28h12c6.4 44.7 45 79.2 91.5 79.2s85.1-34.5 91.5-79.2h12c17 0 31.7-11.5 35.7-28l0.1-0.6 5.6-35.7c0.2-0.9 0.4-1.8 0.4-2.7l18.9-120.4c6.4-25.7 19.3-49.6 37.3-69.1 47.5-51.5 73.3-118.5 72.7-188.6-0.7-72.6-29.6-140.9-81.5-192.2-51.6-51.1-120.1-79.3-192.6-79.3z m122.9 606.2l-4.4 28H393.6l-4.4-28h245.7zM512 931c-30.4 0-55.9-21.6-62-50.2h124c-6.1 28.6-31.6 50.2-62 50.2z m103.5-79.3h-207c-3.4 0-6.4-2.2-7.4-5.5l-2.9-18.9H626l-3 18.9c-1 3.3-4 5.5-7.5 5.5z m76.8-247c-21.5 23.2-36.8 51.7-44.3 82.4l-0.1 0.6-8.4 53.6h-113V570.8c0-8-6.5-14.5-14.5-14.5s-14.5 6.5-14.5 14.5v170.5H384.7l-8.1-51.9-0.1-0.6c-7.4-30.4-22.6-58.6-43.8-81.7-42.5-46.2-65.9-106.1-65.9-168.7 0-135.1 109.9-245.1 245-245.3h0.3c134 0 244 108.9 245.3 242.9 0.4 62.8-22.6 122.6-65.1 168.7z', c:'#274359'},
+  {d:'M512 467c-8 0-14.5 6.5-14.5 14.5v29.7c0 8 6.5 14.5 14.5 14.5s14.5-6.5 14.5-14.5v-29.7c0-8-6.5-14.5-14.5-14.5zM511.4 146.9c8 0 14.5-6.5 14.5-14.5V78.5c0-8-6.5-14.5-14.5-14.5s-14.5 6.5-14.5 14.5v53.8c0 8.1 6.5 14.6 14.5 14.6zM281.4 234.1c2.8 2.8 6.5 4.3 10.3 4.3 3.7 0 7.4-1.4 10.3-4.3 5.7-5.7 5.7-14.9 0-20.5l-38.1-38.1c-5.7-5.7-14.9-5.7-20.5 0-5.7 5.7-5.7 14.9 0 20.5l38 38.1zM201 429.4h-53.8c-8 0-14.5 6.5-14.5 14.5s6.5 14.5 14.5 14.5H201c8 0 14.5-6.5 14.5-14.5 0.1-8-6.4-14.5-14.5-14.5zM282.3 653.4l-38.1 38.1c-5.7 5.7-5.7 14.9 0 20.5 2.8 2.8 6.5 4.3 10.3 4.3 3.7 0 7.4-1.4 10.3-4.3l38.1-38.1c5.7-5.7 5.7-14.9 0-20.5-5.8-5.7-14.9-5.7-20.6 0zM742.6 652.5c-5.7-5.7-14.9-5.7-20.5 0-5.7 5.7-5.7 14.9 0 20.5l38.1 38.1c2.8 2.8 6.5 4.3 10.3 4.3s7.4-1.4 10.3-4.3c5.7-5.7 5.7-14.9 0-20.5l-38.2-38.1zM876.8 428.2H823c-8 0-14.5 6.5-14.5 14.5s6.5 14.5 14.5 14.5h53.8c8 0 14.5-6.5 14.5-14.5s-6.5-14.5-14.5-14.5zM731.4 237.5c3.7 0 7.4-1.4 10.3-4.3l38.1-38.1c5.7-5.7 5.7-14.9 0-20.5-5.7-5.7-14.9-5.7-20.5 0l-38.1 38.1c-5.7 5.7-5.7 14.9 0 20.5 2.8 2.9 6.5 4.3 10.2 4.3z', c:'#274359'}
+];
+function bulbSVG(size, main, deep, isNull, sel){
+  const body = isNull ? '#D3DBE4' : (sel ? deep : main);
+  let inner = '';
+  for (let i = 0; i < BULB_PATHS.length; i++){
+    const p = BULB_PATHS[i];
+    inner += '<path d="' + p.d + '" fill="' + (p.c === 'BODY' ? body : p.c) + '"/>';
+  }
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size + '" viewBox="0 0 1024 1024">'
+    + (isNull ? '<g opacity=".6">' : '') + inner + (isNull ? '</g>' : '') + '</svg>';
 }
 function paintBulbs(){
   if (!mapReady) return;
@@ -1365,18 +1368,17 @@ function paintBulbs(){
       const sel = (c.type==='mine') ? (selectedMine===c.idx) : (selectedKey===c.k);
       const isNull = (c.v == null);
       const t = isNull ? 0 : Math.log(1 + c.v) / Math.log(1 + maxV);   // 对数刻度，避免极值压扁其它灯泡
-      const r = isNull ? 9 : Math.max(11, Math.round(11 + 17 * t + (sel ? 5 : 0)));
+      const size = isNull ? 30 : Math.max(30, Math.round(30 + 30 * t + (sel ? 8 : 0)));
       const key = c.type==='mine' ? ('m'+c.idx) : c.k;
-      bulbSizes[key] = r;
+      bulbSizes[key] = size;
       const el0 = elDef();
       const col = (curLv==='region') ? (RC[c.rg] || {c1:el0.c1,c2:el0.c2,deep:el0.deep})
                                      : {c1:el0.c1, c2:el0.c2, deep:el0.deep};
       const sid = 'blb' + i;
-      const pad = 5, W = r * 2 + pad * 2, sockH = Math.max(5, Math.round(r * 0.62));
       S[sid] = new TMap.MarkerStyle({
-        width: W, height: r * 2 + pad * 2 + sockH,
-        anchor: { x: W / 2, y: r + pad },          // 锚点落在灯泡圆心
-        src: svgToURI(bulbSVG(r, col.c2, col.deep, isNull, sel))
+        width: size, height: size,
+        anchor: { x: size / 2, y: Math.round(size * 0.559) },   // 灯泡视觉中心（玻璃球心偏下一点）
+        src: svgToURI(bulbSVG(size, col.c2, col.deep, isNull, sel))
       });
       G.push({ id:'blb' + i, styleId:sid, rank:(sel ? 40 : 20),
                position: new TMap.LatLng(c.lat, c.lng),
@@ -1392,14 +1394,14 @@ function paintLabels(){
     const S={}, G=[];
     cols.forEach((c,i) => {
       const sel = (c.type==='mine') ? (selectedMine===c.idx) : (selectedKey===c.k);
-      const bR = bulbSizes[c.type==='mine' ? ('m'+c.idx) : c.k] || 12;
+      const bSz = bulbSizes[c.type==='mine' ? ('m'+c.idx) : c.k] || 34;
       const el1 = elDef();
       const col = (curLv==='region') ? (RC[c.rg] || {c1:el1.c1,c2:el1.c2,deep:el1.deep})
                                      : {c1:el1.c1, c2:el1.c2, deep:el1.deep};
       const sid = 'lb'+i;
       S[sid] = new TMap.LabelStyle({
         color:'#fff', size: sel?13:11.5, alignment:'center', verticalAlignment:'middle',
-        offset:{ x:0, y: -Math.round(bR + 15) },
+        offset:{ x:0, y: -Math.round(bSz * 0.40 + 10) },
         padding: sel ? '5px 12px' : '3px 9px',
         backgroundColor: sel ? col.c2 : 'rgba(15,23,42,.78)',
         borderRadius: 7
