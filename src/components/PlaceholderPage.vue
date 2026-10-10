@@ -27,13 +27,13 @@ function categoryOf(resource) {
 }
 function baseRows() {
   if (props.title.includes('用户')) return [
-    { id: 'u1', name: '林予安', category: '平台管理员', location: '广西', companies: '平台运营', demand: '管理员', status: '启用', description: '系统管理员账户' },
+    { id: 'u1', name: '管理员', category: '平台管理员', location: '广西', companies: '平台运营', demand: '管理员', status: '启用', description: '系统管理员账户' },
     { id: 'u2', name: '资源审核员', category: '审核人员', location: '广西', companies: '资源管理', demand: '审核员', status: '启用', description: '负责资源信息审核' },
     { id: 'u3', name: '企业用户', category: '企业账户', location: '广西及东盟', companies: '供需对接', demand: '普通用户', status: '启用', description: '维护企业需求信息' },
   ]
   if (props.title.includes('操作日志')) return [
-    { id: 'l1', name: '资源目录查看', category: '资源管理', location: '广西', companies: '林予安', demand: '今天 09:42', status: '成功', description: '查看矿产资源目录' },
-    { id: 'l2', name: '需求关系更新', category: '供需对接', location: '钦州', companies: '林予安', demand: '今天 09:18', status: '成功', description: '更新企业资源需求关系' },
+    { id: 'l1', name: '资源目录查看', category: '资源管理', location: '广西', companies: '管理员', demand: '今天 09:42', status: '成功', description: '查看矿产资源目录' },
+    { id: 'l2', name: '需求关系更新', category: '供需对接', location: '钦州', companies: '管理员', demand: '今天 09:18', status: '成功', description: '更新企业资源需求关系' },
     { id: 'l3', name: '知识图谱查询', category: '知识图谱', location: '广西及东盟', companies: '资源审核员', demand: '昨天 16:30', status: '成功', description: '筛选区域资源关系' },
   ]
   if (props.title.includes('设置')) return [

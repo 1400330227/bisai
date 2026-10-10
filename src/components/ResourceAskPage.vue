@@ -44,6 +44,20 @@ async function onFile(e) {
 }
 function pickFile() { if (!busy.value && fileInput.value) fileInput.value.click() }
 
+/* 供给侧文案：广西 / 东盟 各自的合计与最大来源地。
+   某一侧没有记录时明确说出来，避免被误读成"那边没有这个资源"。 */
+function supplyText(s) {
+  if (!s) return ''
+  const f = x => Number(x).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  const parts = []
+  if (s.gxTotal != null) parts.push('广西 ' + f(s.gxTotal) + ' ' + s.unit + (s.gx[0] ? '（' + s.gx[0].n + '）' : ''))
+  if (s.aseanTotal != null) parts.push('东盟 ' + f(s.aseanTotal) + ' ' + s.unit + (s.asean[0] ? '（' + s.asean[0].n + '最大）' : ''))
+  if (!parts.length) return '这份公开数据里暂无可比记录'
+  if (s.gxTotal == null) parts.push('（这份表未收录广西口径）')
+  if (s.aseanTotal == null) parts.push('（这份表未收录东盟口径）')
+  return parts.join(' · ')
+}
+
 async function scrollBottom() {
   await nextTick()
   if (threadEl.value) threadEl.value.scrollTop = threadEl.value.scrollHeight
@@ -183,6 +197,9 @@ function onKeydown(e) {
                       <div v-if="r.evidence" class="res-evi">
                         需求侧参考：{{ r.evidence.companies }} —— {{ r.evidence.scale }}
                       </div>
+                      <div v-if="r.supply" class="res-sup">
+                        <span class="sup-tag">供给</span>{{ supplyText(r.supply) || '这份公开数据里暂无可比记录' }}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -307,6 +324,8 @@ function onKeydown(e) {
 .res-name small { margin-left: 6px; font-size: 9px; font-weight: 500; color: #a4a38a; background: #f7f5ec; border: 1px solid #eae6d6; padding: 1px 6px; border-radius: 999px; vertical-align: 1px; }
 .res-rel { font-size: 11px; color: #7d8a85; margin-top: 4px; }
 .res-evi { font-size: 10.5px; color: #8d9a94; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #eef1ef; line-height: 1.6; }
+.res-sup { font-size: 10.5px; color: #4f7a63; margin-top: 5px; padding: 5px 8px; background: #f2f8f4; border-radius: 6px; line-height: 1.6; }
+.sup-tag { display: inline-block; font-size: 9px; font-weight: 600; color: #fff; background: #4f9c76; padding: 1px 6px; border-radius: 4px; margin-right: 6px; vertical-align: 1px; }
 
 .ent-list { display: flex; flex-direction: column; gap: 8px; }
 .ent-row { padding: 10px 12px; border: 1px solid #eef1ef; border-radius: 10px; }
